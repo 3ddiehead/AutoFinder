@@ -54,9 +54,9 @@ def compare(oldJSON, newJSON):
 
 
 # Function to send an email notification
-def send_email_notification(location_name, car):
+def send_email_notification(location_name, car, email):
     sender_email = "electricshingle@gmail.com"
-    receiver_email = "edwardshingler@gmail.com"
+    receiver_email = email
     subject = f"New {car['Year']} {car['Make']} {car['Model']} at {location_name}"
 
     msg = MIMEMultipart()
@@ -216,7 +216,7 @@ def checkPicknPull(checkList):
                         ((int(arrival["Year"]) in years) | (len(years)==0))\
                         ):
                         print("FOUND",arrival)
-                        send_email_notification(location_name, arrival)
+                        send_email_notification(location_name, arrival, member["Email"])
 
     # Close the Selenium WebDriver
     driver.quit()
@@ -225,6 +225,7 @@ def checkPicknPull(checkList):
 if __name__ == '__main__':
     checkList = [{
     "Member":"Eddie",
+    "Email":"edwardshingler@gmail.com",
     "Location":"97266",
     "Cars":[{
         "Make":"Subaru",
@@ -244,6 +245,7 @@ if __name__ == '__main__':
     },
     {
     "Member":"David",
+    "Email":"Doluca.david@gmail.com",
     "Location":"94305",
     "Cars":[{
         "Make":"Mazda",
