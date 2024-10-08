@@ -95,10 +95,36 @@ def checkPicknPull(checkList):
     options = webdriver.ChromeOptions()
     #options.headless = True  # Runs Chrome in headless mode (no GUI)
     driver = webdriver.Chrome(options=options)
+    checked_locations = {}
 
     for member in checkList:
         member_location = member["Location"]
         print(member_location)
+        if member_location in checked_locations.keys():
+            for item in member["Cars"]:
+                print("CHECKING",item)
+                years = []
+                if item["yearSpan"] != "":
+                    sub_spans = item["yearSpan"].split(',')
+                    print(sub_spans)
+                    for span in sub_spans:
+                        if '-' in span:
+                            start_end_year = span.split('-')
+                            year_span = range(int(start_end_year[0]),int(start_end_year[1])+1)
+                            years += year_span
+                        else:
+                            years += [int(span)]
+
+                for arrival in checked_locations[member_location]:
+                    if (
+                        (arrival["Make"] == item["Make"]) &\
+                        (arrival["Model"] == item["Model"]) &\
+                        ((int(arrival["Year"]) in years) | (len(years)==0))\
+                        ):
+                        print("FOUND",arrival)
+                        send_email_notification(location_name, arrival, member["Email"])
+            continue
+
         driver.get(f'https://www.picknpull.com/check-inventory/vehicle-search?make=0&model=0&distance=25&zip={member_location}&year=')
 
         itx = 0
@@ -218,12 +244,15 @@ def checkPicknPull(checkList):
                         print("FOUND",arrival)
                         send_email_notification(location_name, arrival, member["Email"])
 
+            checked_locations[member_location] = arrivals
+
     # Close the Selenium WebDriver
     driver.quit()
     
 
 if __name__ == '__main__':
-    checkList = [{
+    checkList = [
+    {
     "Member":"Eddie",
     "Email":"edwardshingler@gmail.com",
     "Location":"97266",
@@ -252,5 +281,16 @@ if __name__ == '__main__':
         "Model":"MX-5 Miata",
         "yearSpan":"1996-1997"
         }]
-    }]
+    },
+    {
+    "Member":"Jesse",
+    "Email":"Jmcphee7364@gmail.com",
+    "Location":"97266",
+    "Cars":[{
+        "Make":"Toyota",
+        "Model":"Corolla",
+        "yearSpan":"2016"
+        }]
+    }
+    ]
     checkPicknPull(checkList)
