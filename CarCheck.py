@@ -217,9 +217,9 @@ def checkPicknPull(checkList):
                         ):
                         print("FOUND",arrival)
                         send_email_notification(location_name, arrival)
-                        
+
     # Close the Selenium WebDriver
-        driver.quit()
+    driver.quit()
     
 
 if __name__ == '__main__':
