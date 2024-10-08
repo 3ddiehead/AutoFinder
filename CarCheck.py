@@ -3,6 +3,7 @@ import sys
 import time
 import os
 import re
+from datetime import datetime
 
 #email
 import smtplib
@@ -92,113 +93,162 @@ def send_email_notification(location_name, car):
 # Start the process
 def checkPicknPull(checkList):
     options = webdriver.ChromeOptions()
-    options.headless = True  # Runs Chrome in headless mode (no GUI)
+    #options.headless = True  # Runs Chrome in headless mode (no GUI)
     driver = webdriver.Chrome(options=options)
 
-    driver.get('https://www.picknpull.com/check-inventory/vehicle-search?make=0&model=0&distance=50&zip=97266&year=')
+    for member in checkList:
+        member_location = member["Location"]
+        print(member_location)
+        driver.get(f'https://www.picknpull.com/check-inventory/vehicle-search?make=0&model=0&distance=25&zip={member_location}&year=')
 
-    itx = 0
-    while True:
-        try:
-            WebDriverWait(driver, 5).until(
-                EC.text_to_be_present_in_element((By.XPATH, "//*[@id='resultsList']"), "Pick-n-Pull - Portland South")
-            )
-            print("Page Loaded")
-            break
-        except:
-            if itx > 4:
-                print('There was an issue connecting with the website.')
+        itx = 0
+        while True:
+            try:
+                WebDriverWait(driver, 5).until(
+                    EC.text_to_be_present_in_element((By.XPATH, "//*[@id='resultsList']"), "Pick-n-Pull - Portland South")
+                )
+                print("Page Loaded")
                 break
-            itx += 1
-            print("Could not connect, trying again:", str(itx) + "/5")
+            except:
+                if itx > 4:
+                    print('There was an issue connecting with the website.')
+                    break
+                itx += 1
+                print("Could not connect, trying again:", str(itx) + "/5")
 
-    # Use BeautifulSoup for faster parsing
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
+        # Use BeautifulSoup for faster parsing
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-    # Close the Selenium WebDriver
-    driver.quit()
+        # Close the Selenium WebDriver
+        driver.quit()
 
-    # Locate the results list
-    locations = soup.find_all('span', id='resultsList')
+        # Locate the results list
+        locations = soup.find_all('span', id='resultsList')
 
-    for location in locations:
-        # Extract the location
-        location_name = location.find('a').get_text().strip()[14:]
-        print(location_name)
+        for location in locations:
+            # Extract the location
+            location_name = location.find('a').get_text().strip()[14:]
+            print(location_name)
 
-        # Initialize the DataFrame
-        df = pd.DataFrame(columns=["Image", "Year", "Make", "Model", "Row", "Set Date"])
+            # Initialize the DataFrame
+            df = pd.DataFrame(columns=["Image", "Year", "Make", "Model", "Row", "Set Date"])
 
-        # Iterate through each row in the results list table
-        for car in location.find_all('tr'):
-            value_list = [td.get_text() for td in car.find_all('td')]
-            # Only add the row if it has exactly 7 columns to match your DataFrame
-            if len(value_list) == 7:
-                image_src = car.find('img')['src'] if car.find('img') else None
-                new_row = pd.DataFrame({
-                    'Image': [image_src],
-                    'Year': [value_list[1]], 
-                    'Make': [value_list[2]], 
-                    'Model': [value_list[3]], 
-                    'Row': [value_list[4]], 
-                    'Set Date': [value_list[5]]
-                })
-                df = pd.concat([df, new_row], ignore_index=True)
+            # Iterate through each row in the results list table
+            for car in location.find_all('tr'):
+                value_list = [td.get_text() for td in car.find_all('td')]
+                # Only add the row if it has exactly 7 columns to match your DataFrame
+                if len(value_list) == 7:
+                    image_src = car.find('img')['src'] if car.find('img') else None
+                    new_row = pd.DataFrame({
+                        'Image': [image_src],
+                        'Year': [value_list[1]], 
+                        'Make': [value_list[2]], 
+                        'Model': [value_list[3]], 
+                        'Row': [value_list[4]], 
+                        'Set Date': [value_list[5]]
+                    })
+                    df = pd.concat([df, new_row], ignore_index=True)
 
-        print(df.info())
+            print(df.info())
 
-        # Load old JSON if it exists, or create an empty one
-        try:
-            with open(f"./{location_name}.json", "r") as file:
-                oldJSON = file.read()
-        except FileNotFoundError:
-            oldJSON = "{}"
+            # Load old JSON if it exists, or create an empty one
+            try:
+                with open(f"./{location_name}.json", "r") as file:
+                    oldJSON = file.read()
+            except FileNotFoundError:
+                oldJSON = "{}"
 
-        # Save the new data to JSON
-        newJSON = df.to_json(orient='records')
+            # Save the new data to JSON
+            newJSON = df.to_json(orient='records')
 
-        with open(f"./{location_name}.json", "w") as file:
-            file.write(newJSON)
+            with open(f"./{location_name}.json", "w") as file:
+                file.write(newJSON)
 
-        # Compare old and new JSON and send an email if there's a change
-        arrivals, departures = compare(oldJSON, newJSON)
+            # Compare old and new JSON and send an email if there's a change
+            arrivals, departures = compare(oldJSON, newJSON)
 
-        for item in checkList:
-            print("CHECKING",item)
-            years = []
-            if item["yearSpan"] != "":
-                sub_spans = item["yearSpan"].split(',')
-                print(sub_spans)
-                for span in sub_spans:
-                    if '-' in span:
-                        start_end_year = span.split('-')
-                        year_span = range(int(start_end_year[0]),int(start_end_year[1])+1)
-                        years += year_span
-                    else:
-                        years += [int(span)]
+            arrivals = [{**arrival,"Check Time":datetime.now().strftime("%H:%M %m/%d/%Y")} for arrival in arrivals]
+            departures = [{**departure,"Check Time":datetime.now().strftime("%H:%M %m/%d/%Y")} for departure in departures]
 
-            for arrival in arrivals:
-                if (
-                    (arrival["Make"] == item["Make"]) &\
-                    (arrival["Model"] == item["Model"]) &\
-                    ((int(arrival["Year"]) in years) | (len(years)==0))\
-                    ):
-                    print("FOUND",arrival)
-                    send_email_notification(location_name, arrival)
+            # Load old JSON if it exists, or create an empty one
+            try:
+                with open(f"./{location_name}_arrivals.json", "r") as file:
+                    oldJSON = file.read()
+            except FileNotFoundError:
+                oldJSON = "{}"
+
+            # Save the new data to JSON
+            oldList = json.loads(oldJSON)
+            newList = oldList + arrivals
+
+            with open(f"./{location_name}_arrivals.json", "w") as file:
+                file.write(json.dumps(newList))
+
+            # Load old JSON if it exists, or create an empty one
+            try:
+                with open(f"./{location_name}_departures.json", "r") as file:
+                    oldJSON = file.read()
+            except FileNotFoundError:
+                oldJSON = "{}"
+
+            # Save the new data to JSON
+            oldList = json.loads(oldJSON)
+            newList = oldList + departures
+
+            with open(f"./{location_name}_departures.json", "w") as file:
+                file.write(json.dumps(newList))
+
+            for item in member["Cars"]:
+                print("CHECKING",item)
+                years = []
+                if item["yearSpan"] != "":
+                    sub_spans = item["yearSpan"].split(',')
+                    print(sub_spans)
+                    for span in sub_spans:
+                        if '-' in span:
+                            start_end_year = span.split('-')
+                            year_span = range(int(start_end_year[0]),int(start_end_year[1])+1)
+                            years += year_span
+                        else:
+                            years += [int(span)]
+
+                for arrival in arrivals:
+                    if (
+                        (arrival["Make"] == item["Make"]) &\
+                        (arrival["Model"] == item["Model"]) &\
+                        ((int(arrival["Year"]) in years) | (len(years)==0))\
+                        ):
+                        print("FOUND",arrival)
+                        send_email_notification(location_name, arrival)
     
 
 if __name__ == '__main__':
     checkList = [{
-    "Make":"Subaru",
-    "Model":"Impreza",
-    "yearSpan":"1998-2001"},
+    "Member":"Eddie",
+    "Location":"97266",
+    "Cars":[{
+        "Make":"Subaru",
+        "Model":"Impreza",
+        "yearSpan":"1998-2001"
+        },
+        {
+        "Make":"Subaru",
+        "Model":"Impreza Wagon",
+        "yearSpan":"1998-2001"
+        },
+        {
+        "Make":"Subaru",
+        "Model":"Crosstrek",
+        "yearSpan":"1998-2001"
+        }]
+    },
     {
-    "Make":"Subaru",
-    "Model":"Impreza Wagon",
-    "yearSpan":"1998-2001"},
-    {
-    "Make":"Subaru",
-    "Model":"Crosstrek",
-    "yearSpan":"1998-2001"}
-    ]
+    "Member":"David",
+    "Location":"94305",
+    "Cars":[{
+        "Make":"Mazda",
+        "Model":"MX-5 Miata",
+        "yearSpan":"1996-1997"
+        }]
+    }]
     checkPicknPull(checkList)
