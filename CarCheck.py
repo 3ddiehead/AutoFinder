@@ -119,9 +119,6 @@ def checkPicknPull(checkList):
         # Use BeautifulSoup for faster parsing
         soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-        # Close the Selenium WebDriver
-        driver.quit()
-
         # Locate the results list
         locations = soup.find_all('span', id='resultsList')
 
@@ -220,6 +217,9 @@ def checkPicknPull(checkList):
                         ):
                         print("FOUND",arrival)
                         send_email_notification(location_name, arrival)
+                        
+    # Close the Selenium WebDriver
+        driver.quit()
     
 
 if __name__ == '__main__':
