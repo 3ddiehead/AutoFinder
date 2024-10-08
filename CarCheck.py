@@ -105,7 +105,7 @@ def checkPicknPull(checkList):
         while True:
             try:
                 WebDriverWait(driver, 5).until(
-                    EC.text_to_be_present_in_element((By.XPATH, "//*[@id='resultsList']"), "Pick-n-Pull - Portland South")
+                    EC.text_to_be_present_in_element((By.XPATH, "//*[@id='resultsList']"), "Pick-n-Pull - ")
                 )
                 print("Page Loaded")
                 break
@@ -175,7 +175,7 @@ def checkPicknPull(checkList):
                 with open(f"./{location_name}_arrivals.json", "r") as file:
                     oldJSON = file.read()
             except FileNotFoundError:
-                oldJSON = "{}"
+                oldJSON = "[]"
 
             # Save the new data to JSON
             oldList = json.loads(oldJSON)
@@ -189,7 +189,7 @@ def checkPicknPull(checkList):
                 with open(f"./{location_name}_departures.json", "r") as file:
                     oldJSON = file.read()
             except FileNotFoundError:
-                oldJSON = "{}"
+                oldJSON = "[]"
 
             # Save the new data to JSON
             oldList = json.loads(oldJSON)
